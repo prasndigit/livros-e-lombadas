@@ -12,6 +12,13 @@ export interface ShelfBook {
   capturedAt: string;
 }
 
+export interface ShelfHit {
+  shelfId: number;
+  shelfName: string;
+  shelfLocation: string | null;
+  rawText: string;
+}
+
 interface StoredShelf {
   id: number;
   name: string;
@@ -71,6 +78,25 @@ export async function getShelfBooks(shelfId: number): Promise<ShelfBook[]> {
 
 export async function deleteShelf(id: number): Promise<void> {
   writeAll(readAll().filter((s) => s.id !== id));
+}
+
+export async function searchShelfBooks(query: string): Promise<ShelfHit[]> {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const hits: ShelfHit[] = [];
+  for (const shelf of readAll()) {
+    for (const book of shelf.books) {
+      if (book.rawText.toLowerCase().includes(q)) {
+        hits.push({
+          shelfId: shelf.id,
+          shelfName: shelf.name,
+          shelfLocation: shelf.location,
+          rawText: book.rawText,
+        });
+      }
+    }
+  }
+  return hits;
 }
 
 // bookId is the array index (see getShelfBooks, which returns id: i).

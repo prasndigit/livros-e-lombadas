@@ -17,6 +17,13 @@ export interface ShelfBook {
   capturedAt: string;
 }
 
+export interface ShelfHit {
+  shelfId: number;
+  shelfName: string;
+  shelfLocation: string | null;
+  rawText: string;
+}
+
 export async function initShelfStore(): Promise<void> {
   const db = await dbPromise;
   await db.execAsync(`
@@ -79,6 +86,21 @@ export async function deleteShelf(id: number): Promise<void> {
   const db = await dbPromise;
   await db.runAsync('DELETE FROM shelf_books WHERE shelfId = ?;', id);
   await db.runAsync('DELETE FROM shelves WHERE id = ?;', id);
+}
+
+/** Substring search across every title in every saved shelf. */
+export async function searchShelfBooks(query: string): Promise<ShelfHit[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const db = await dbPromise;
+  const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+  return db.getAllAsync<ShelfHit>(
+    `SELECT b.rawText AS rawText, s.id AS shelfId, s.name AS shelfName, s.location AS shelfLocation
+     FROM shelf_books b JOIN shelves s ON s.id = b.shelfId
+     WHERE lower(b.rawText) LIKE lower(?) ESCAPE '\\'
+     ORDER BY s.id DESC, b.id ASC;`,
+    like
+  );
 }
 
 export async function deleteShelfBook(shelfId: number, bookId: number): Promise<void> {
