@@ -1,6 +1,8 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { getSearchLang, languageName } from '../books/searchLanguage';
+import { tidyShelfTitles } from '../books/tidyTitles';
 import { discardPhoto, recognizeText } from '../ocr/textRecognition';
 import { createShelf, initShelfStore } from '../storage/shelfStore';
 
@@ -79,9 +81,22 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
       return;
     }
     setSaving(true);
+
+    // titles are prepended newest-first while scanning; store in capture order
+    const raw = [...titles].reverse();
+
+    // One spell-correction pass over the whole session. If it fails (offline,
+    // server error) we still save the raw OCR reads.
+    let toSave = raw;
     try {
-      // titles are prepended newest-first while scanning; store in capture order
-      await createShelf(name, location, [...titles].reverse());
+      const lang = await getSearchLang();
+      toSave = await tidyShelfTitles(raw, languageName(lang));
+    } catch {
+      toSave = raw;
+    }
+
+    try {
+      await createShelf(name, location, toSave);
       onDone();
     } catch {
       setSaving(false);
@@ -170,7 +185,7 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
         <Pressable style={styles.finishButton} onPress={finish} disabled={saving}>
           <Text style={styles.finishButtonText}>
             {saving
-              ? 'A guardar...'
+              ? 'A corrigir e guardar...'
               : titles.length === 0
                 ? 'Terminar (sem títulos)'
                 : `Terminar estante (${titles.length})`}
