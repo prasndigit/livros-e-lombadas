@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { getWishlistEntries } from '../storage/wishlistStore';
 
-export type HomeDestination = 'title' | 'author' | 'shelf';
+export type HomeDestination = 'title' | 'author' | 'shelf' | 'shelves';
 
 interface Props {
   onNavigate: (dest: HomeDestination) => void;
@@ -52,6 +52,10 @@ export default function HomeScreen({ onNavigate, onGoToScan, refreshKey }: Props
           <Text style={styles.scanShortcutText}>Ir para o scan ({count} livro{count === 1 ? '' : 's'})</Text>
         </Pressable>
       )}
+
+      <Pressable style={styles.secondaryLink} onPress={() => onNavigate('shelves')}>
+        <Text style={styles.secondaryLinkText}>Estantes guardadas ›</Text>
+      </Pressable>
     </View>
   );
 }
@@ -78,4 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scanShortcutText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  secondaryLink: { marginTop: 18, alignSelf: 'center', padding: 8 },
+  secondaryLinkText: { color: '#2f6690', fontSize: 14, fontWeight: '600' },
 });
+

@@ -2,20 +2,22 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 interface Props {
+  onDone: () => void;
   onBack: () => void;
 }
 
-export default function SaveShelfScreen({ onBack }: Props) {
+/**
+ * Web stub. Shelf cataloguing relies on the phone's on-device text
+ * recognition; the web build has no equivalent OCR path.
+ */
+export default function ShelfScanScreen({ onBack }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Guardar estante</Text>
       <Text style={styles.body}>
-        Aqui vais poder varrer as lombadas de uma estante inteira, dar-lhe um nome e uma
-        localização (ex.: "A estante da casa da Rita") e guardar todos os títulos lidos numa
-        base de dados local.
+        A catalogação de estantes usa a câmara e o reconhecimento de texto do telemóvel. Abre a
+        app no telemóvel para usar esta função.
       </Text>
-      <Text style={styles.soon}>Em breve.</Text>
-
       <Pressable style={styles.backButton} onPress={onBack}>
         <Text style={styles.backButtonText}>Voltar</Text>
       </Pressable>
@@ -27,7 +29,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 20, paddingTop: 72 },
   heading: { fontSize: 24, fontWeight: '800', marginBottom: 16 },
   body: { fontSize: 15, color: '#444', lineHeight: 22 },
-  soon: { fontSize: 15, color: '#1b998b', fontWeight: '700', marginTop: 20 },
   backButton: {
     marginTop: 32,
     backgroundColor: '#2f6690',

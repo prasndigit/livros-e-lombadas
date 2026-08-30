@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import AuthorSearchScreen from './src/screens/AuthorSearchScreen';
 import HomeScreen, { HomeDestination } from './src/screens/HomeScreen';
-import SaveShelfScreen from './src/screens/SaveShelfScreen';
 import ScanScreen from './src/screens/ScanScreen';
+import ShelfScanScreen from './src/screens/ShelfScanScreen';
+import ShelvesScreen from './src/screens/ShelvesScreen';
 import WishlistScreen from './src/screens/WishlistScreen';
 import { getWishlistEntries } from './src/storage/wishlistStore';
 import { WishlistEntry } from './src/types/book';
@@ -49,7 +50,9 @@ export default function App() {
 
       {route === 'author' && <AuthorSearchScreen onBack={goHome} onAdded={goHome} />}
 
-      {route === 'shelf' && <SaveShelfScreen onBack={goHome} />}
+      {route === 'shelf' && <ShelfScanScreen onBack={goHome} onDone={() => setRoute('shelves')} />}
+
+      {route === 'shelves' && <ShelvesScreen onBack={goHome} />}
 
       {route === 'scan' && scanWishlist && (
         <ScanScreen wishlist={scanWishlist} onBack={goHome} />
