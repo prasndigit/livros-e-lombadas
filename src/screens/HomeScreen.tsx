@@ -1,12 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  DEFAULT_LANG,
-  getSearchLang,
-  SEARCH_LANGS,
-  SearchLang,
-  setSearchLang,
-} from '../books/searchLanguage';
+import { useT } from '../i18n/I18nProvider';
+import { APP_LANGS } from '../i18n/langs';
 import { getWishlistEntries } from '../storage/wishlistStore';
 
 export type HomeDestination = 'title' | 'author' | 'shelf' | 'shelves';
@@ -19,8 +14,8 @@ interface Props {
 }
 
 export default function HomeScreen({ onNavigate, onGoToScan, refreshKey }: Props) {
+  const { t, plural, lang, setLang } = useT();
   const [count, setCount] = useState<number | null>(null);
-  const [lang, setLang] = useState<SearchLang>(DEFAULT_LANG);
 
   const reloadCount = useCallback(async () => {
     try {
@@ -35,46 +30,39 @@ export default function HomeScreen({ onNavigate, onGoToScan, refreshKey }: Props
     reloadCount();
   }, [reloadCount, refreshKey]);
 
-  useEffect(() => {
-    getSearchLang().then(setLang);
-  }, []);
-
-  const chooseLang = (code: SearchLang) => {
-    setLang(code);
-    setSearchLang(code);
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Livros e Lombadas</Text>
-      <Text style={styles.subheading}>O que queres fazer?</Text>
+      <Text style={styles.subheading}>{t('home.subtitle')}</Text>
 
       <Pressable style={styles.option} onPress={() => onNavigate('title')}>
-        <Text style={styles.optionText}>Procurar livro por título</Text>
-        <Text style={styles.optionHint}>Procura um título e junta-o à lista a scanear</Text>
+        <Text style={styles.optionText}>{t('home.byTitle')}</Text>
+        <Text style={styles.optionHint}>{t('home.byTitleHint')}</Text>
       </Pressable>
 
       <Pressable style={styles.option} onPress={() => onNavigate('author')}>
-        <Text style={styles.optionText}>Procurar livro por autor</Text>
-        <Text style={styles.optionHint}>Escolhe um autor e junta obras da bibliografia dele</Text>
+        <Text style={styles.optionText}>{t('home.byAuthor')}</Text>
+        <Text style={styles.optionHint}>{t('home.byAuthorHint')}</Text>
       </Pressable>
 
       <Pressable style={styles.option} onPress={() => onNavigate('shelf')}>
-        <Text style={styles.optionText}>Guardar estante</Text>
-        <Text style={styles.optionHint}>Regista as lombadas de uma estante e dá-lhe nome e local</Text>
+        <Text style={styles.optionText}>{t('home.shelf')}</Text>
+        <Text style={styles.optionHint}>{t('home.shelfHint')}</Text>
       </Pressable>
 
-      <Text style={styles.langLabel}>Idioma das pesquisas</Text>
+      <Text style={styles.langLabel}>{t('home.appLanguage')}</Text>
       <View style={styles.langRow}>
-        {SEARCH_LANGS.map((l) => {
+        {APP_LANGS.map((l) => {
           const on = l.code === lang;
           return (
             <Pressable
               key={l.code}
               style={[styles.langChip, on && styles.langChipOn]}
-              onPress={() => chooseLang(l.code)}
+              onPress={() => setLang(l.code)}
             >
-              <Text style={[styles.langChipText, on && styles.langChipTextOn]}>{l.short}</Text>
+              <Text style={[styles.langChipText, on && styles.langChipTextOn]}>
+                {l.flag} {l.short}
+              </Text>
             </Pressable>
           );
         })}
@@ -83,13 +71,13 @@ export default function HomeScreen({ onNavigate, onGoToScan, refreshKey }: Props
       {count !== null && count > 0 && (
         <Pressable style={styles.scanShortcut} onPress={onGoToScan}>
           <Text style={styles.scanShortcutText}>
-            Ir para o scan ({count} livro{count === 1 ? '' : 's'})
+            {t('home.goToScan', { count, noun: plural(count, 'common.book') })}
           </Text>
         </Pressable>
       )}
 
       <Pressable style={styles.secondaryLink} onPress={() => onNavigate('shelves')}>
-        <Text style={styles.secondaryLinkText}>Estantes guardadas ›</Text>
+        <Text style={styles.secondaryLinkText}>{t('home.savedShelves')}</Text>
       </Pressable>
     </View>
   );

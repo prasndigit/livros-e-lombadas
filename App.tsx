@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
+import { I18nProvider } from './src/i18n/I18nProvider';
 import AuthorSearchScreen from './src/screens/AuthorSearchScreen';
 import HomeScreen, { HomeDestination } from './src/screens/HomeScreen';
 import ScanScreen from './src/screens/ScanScreen';
@@ -29,37 +30,37 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {route === 'home' && (
-        <HomeScreen
-          onNavigate={(dest) => setRoute(dest)}
-          onGoToScan={goToScanWithCurrentList}
-          refreshKey={wishlistVersion}
-        />
-      )}
+    <I18nProvider>
+      <SafeAreaView style={styles.container}>
+        {route === 'home' && (
+          <HomeScreen
+            onNavigate={(dest) => setRoute(dest)}
+            onGoToScan={goToScanWithCurrentList}
+            refreshKey={wishlistVersion}
+          />
+        )}
 
-      {route === 'title' && (
-        <WishlistScreen
-          onBack={goHome}
-          onGoToScan={(wishlist) => {
-            setScanWishlist(wishlist);
-            setRoute('scan');
-          }}
-        />
-      )}
+        {route === 'title' && (
+          <WishlistScreen
+            onBack={goHome}
+            onGoToScan={(wishlist) => {
+              setScanWishlist(wishlist);
+              setRoute('scan');
+            }}
+          />
+        )}
 
-      {route === 'author' && <AuthorSearchScreen onBack={goHome} onAdded={goHome} />}
+        {route === 'author' && <AuthorSearchScreen onBack={goHome} onAdded={goHome} />}
 
-      {route === 'shelf' && <ShelfScanScreen onBack={goHome} onDone={() => setRoute('shelves')} />}
+        {route === 'shelf' && <ShelfScanScreen onBack={goHome} onDone={() => setRoute('shelves')} />}
 
-      {route === 'shelves' && <ShelvesScreen onBack={goHome} />}
+        {route === 'shelves' && <ShelvesScreen onBack={goHome} />}
 
-      {route === 'scan' && scanWishlist && (
-        <ScanScreen wishlist={scanWishlist} onBack={goHome} />
-      )}
+        {route === 'scan' && scanWishlist && <ScanScreen wishlist={scanWishlist} onBack={goHome} />}
 
-      <StatusBar style="auto" />
-    </SafeAreaView>
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    </I18nProvider>
   );
 }
 

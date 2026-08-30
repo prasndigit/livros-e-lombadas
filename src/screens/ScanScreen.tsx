@@ -3,6 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import FoundPhoto from '../components/FoundPhoto';
+import { useT } from '../i18n/I18nProvider';
 import { playAlertSound, primeAlertSound } from '../alert/sound';
 import { findWishlistMatch } from '../match/fuzzyMatch';
 import { discardPhoto, recognizeText } from '../ocr/textRecognition';
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function ScanScreen({ wishlist, onBack }: Props) {
+  const { t, plural } = useT();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const isProcessingRef = useRef(false);
@@ -164,11 +166,9 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.permissionText}>
-          Precisamos de acesso à câmara para identificar os livros.
-        </Text>
+        <Text style={styles.permissionText}>{t('scan.needCamera')}</Text>
         <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Permitir câmara</Text>
+          <Text style={styles.buttonText}>{t('common.allowCamera')}</Text>
         </Pressable>
       </View>
     );
@@ -178,13 +178,13 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.logHeader}>
-          <Text style={styles.logHeaderText}>Registo de tentativas ({log.length})</Text>
+          <Text style={styles.logHeaderText}>{t('scan.logHeading', { count: log.length })}</Text>
           <Pressable onPress={() => setLog([])}>
-            <Text style={styles.logHeaderAction}>limpar</Text>
+            <Text style={styles.logHeaderAction}>{t('author.clear')}</Text>
           </Pressable>
         </View>
         <ScrollView style={styles.logScroll}>
-          {log.length === 0 && <Text style={styles.debugText}>(ainda sem tentativas)</Text>}
+          {log.length === 0 && <Text style={styles.debugText}>{t('scan.logEmpty')}</Text>}
           {log.map((item, i) => (
             <View key={i} style={styles.logEntry}>
               <Pressable onPress={() => setZoomedEntry(item)}>
@@ -196,7 +196,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
               <View style={styles.logEntryText}>
                 <Text style={styles.logEntryTime}>{item.time}</Text>
                 <Text style={item.matchedTitle ? styles.logEntryMatched : styles.debugText}>
-                  {item.matchedTitle ? `✓ ${item.matchedTitle}` : '(sem correspondência)'}
+                  {item.matchedTitle ? `✓ ${item.matchedTitle}` : t('scan.noMatch')}
                 </Text>
                 <Text style={styles.debugText}>{item.debugText}</Text>
               </View>
@@ -210,7 +210,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
             setShowLog(false);
           }}
         >
-          <Text style={styles.backButtonText}>Voltar ao scan</Text>
+          <Text style={styles.backButtonText}>{t('scan.backToScan')}</Text>
         </Pressable>
 
         {zoomedEntry && (
@@ -225,7 +225,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
               />
             </View>
             <Pressable style={styles.zoomCloseButton} onPress={() => setZoomedEntry(null)}>
-              <Text style={styles.backButtonText}>Voltar ao tamanho original</Text>
+              <Text style={styles.backButtonText}>{t('scan.backToSize')}</Text>
             </Pressable>
           </View>
         )}
@@ -252,21 +252,24 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
           style={styles.flipButton}
           onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
         >
-          <Text style={styles.flipButtonText}>Trocar câmara</Text>
+          <Text style={styles.flipButtonText}>{t('scan.flip')}</Text>
         </Pressable>
         <Pressable style={styles.logButton} onPress={() => setShowLog(true)}>
-          <Text style={styles.flipButtonText}>Ver registo ({log.length})</Text>
+          <Text style={styles.flipButtonText}>{t('scan.viewLog', { count: log.length })}</Text>
         </Pressable>
       </View>
 
       <View style={[styles.footer, matchedEntry && styles.footerMatched]}>
         <Text style={styles.footerText}>
           {matchedEntry
-            ? `✓ Encontrado: ${matchedEntry.title}`
-            : `A procurar ${wishlist.length} livro(s)...`}
+            ? t('scan.foundLabel', { title: matchedEntry.title })
+            : t('scan.searchingN', {
+                count: wishlist.length,
+                noun: plural(wishlist.length, 'common.book'),
+              })}
         </Text>
         <Pressable style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Voltar à wishlist</Text>
+          <Text style={styles.backButtonText}>{t('scan.backToList')}</Text>
         </Pressable>
       </View>
     </View>

@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Pressable, StyleSheet, Text, View, Image } from 'react-native';
+import { useT } from '../i18n/I18nProvider';
 import { playAlertSound, primeAlertSound } from '../alert/sound';
 import { persistMatchedPhoto } from '../photo/persistMatchedPhoto';
 import { markWishlistEntryFound } from '../storage/wishlistStore';
@@ -56,6 +57,7 @@ const videoStyle: React.CSSProperties = {
  * the user cycle through them explicitly with the "Trocar câmara" button.
  */
 export default function ScanScreen({ wishlist, onBack }: Props) {
+  const { t, plural } = useT();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -109,7 +111,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       setDevices(list.filter((d) => d.kind === 'videoinput'));
       setPermissionError(null);
     } catch {
-      setPermissionError('Precisamos de acesso à câmara para identificar os livros.');
+      setPermissionError(t('scan.needCamera'));
     }
   };
 
@@ -237,7 +239,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       <View style={styles.container}>
         <Text style={styles.permissionText}>{permissionError}</Text>
         <Pressable style={styles.button} onPress={() => startStream()}>
-          <Text style={styles.buttonText}>Tentar outra vez</Text>
+          <Text style={styles.buttonText}>{t('common.retry')}</Text>
         </Pressable>
       </View>
     );
@@ -248,11 +250,11 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       <View style={styles.container}>
         <Text style={styles.permissionText}>
           {serverConfigError}
-          {'\n\n'}Define a variável de ambiente ANTHROPIC_API_KEY nas definições do projeto no Vercel
-          (Settings → Environment Variables) e volta a publicar.
+          {'\n\n'}
+          {t('scan.serverConfigHint')}
         </Text>
         <Pressable style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Voltar à wishlist</Text>
+          <Text style={styles.backButtonText}>{t('scan.backToList')}</Text>
         </Pressable>
       </View>
     );
@@ -262,13 +264,13 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.logHeader}>
-          <Text style={styles.logHeaderText}>Registo de tentativas ({log.length})</Text>
+          <Text style={styles.logHeaderText}>{t('scan.logHeading', { count: log.length })}</Text>
           <Pressable onPress={() => setLog([])}>
-            <Text style={styles.logHeaderAction}>limpar</Text>
+            <Text style={styles.logHeaderAction}>{t('author.clear')}</Text>
           </Pressable>
         </View>
         <ScrollView style={styles.logScroll}>
-          {log.length === 0 && <Text style={styles.debugText}>(ainda sem tentativas)</Text>}
+          {log.length === 0 && <Text style={styles.debugText}>{t('scan.logEmpty')}</Text>}
           {log.map((item, i) => (
             <View key={i} style={styles.logEntry}>
               <Image source={{ uri: item.imageUri }} style={styles.logThumbnail} />
@@ -277,7 +279,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
                 <Text
                   style={item.matchedTitle ? styles.logEntryMatched : styles.debugText}
                 >
-                  {item.matchedTitle ? `✓ ${item.matchedTitle}` : '(sem correspondência)'}
+                  {item.matchedTitle ? `✓ ${item.matchedTitle}` : t('scan.noMatch')}
                 </Text>
                 <Text style={styles.debugText}>{item.rawReply}</Text>
               </View>
@@ -285,7 +287,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
           ))}
         </ScrollView>
         <Pressable style={styles.backButton} onPress={() => setShowLog(false)}>
-          <Text style={styles.backButtonText}>Voltar ao scan</Text>
+          <Text style={styles.backButtonText}>{t('scan.backToScan')}</Text>
         </Pressable>
       </View>
     );
@@ -298,22 +300,26 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
         <View pointerEvents="none" style={styles.scanGuide} />
         <Pressable style={styles.flipButton} onPress={cycleCamera}>
           <Text style={styles.flipButtonText}>
-            Trocar câmara {devices.length > 1 ? `(${deviceIndex + 1}/${devices.length})` : ''}
+            {t('scan.flip')}{' '}
+            {devices.length > 1 ? `(${deviceIndex + 1}/${devices.length})` : ''}
           </Text>
         </Pressable>
         <Pressable style={styles.logButton} onPress={() => setShowLog(true)}>
-          <Text style={styles.flipButtonText}>Ver registo ({log.length})</Text>
+          <Text style={styles.flipButtonText}>{t('scan.viewLog', { count: log.length })}</Text>
         </Pressable>
       </View>
 
       <View style={[styles.footer, matchedEntry && styles.footerMatched]}>
         <Text style={styles.footerText}>
           {matchedEntry
-            ? `✓ Encontrado: ${matchedEntry.title}`
-            : `A procurar ${wishlist.length} livro(s)...`}
+            ? t('scan.foundLabel', { title: matchedEntry.title })
+            : t('scan.searchingN', {
+                count: wishlist.length,
+                noun: plural(wishlist.length, 'common.book'),
+              })}
         </Text>
         <Pressable style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Voltar à wishlist</Text>
+          <Text style={styles.backButtonText}>{t('scan.backToList')}</Text>
         </Pressable>
       </View>
 

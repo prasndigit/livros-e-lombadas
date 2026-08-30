@@ -20,6 +20,7 @@ import {
   ShelfSummary,
   updateShelfBook,
 } from '../storage/shelfStore';
+import { useT } from '../i18n/I18nProvider';
 import { addWishlistEntry } from '../storage/wishlistStore';
 
 interface Props {
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function ShelvesScreen({ onBack }: Props) {
+  const { t, plural } = useT();
   const [shelves, setShelves] = useState<ShelfSummary[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
   const [books, setBooks] = useState<ShelfBook[]>([]);
@@ -124,12 +126,12 @@ export default function ShelvesScreen({ onBack }: Props) {
     return (
       <View style={styles.container}>
         <Pressable onPress={closeShelf}>
-          <Text style={styles.link}>‹ Estantes</Text>
+          <Text style={styles.link}>{t('common.backShelves')}</Text>
         </Pressable>
-        <Text style={styles.heading}>{shelf?.name ?? 'Estante'}</Text>
+        <Text style={styles.heading}>{shelf?.name ?? ''}</Text>
         {!!shelf?.location && <Text style={styles.meta}>{shelf.location}</Text>}
         <Text style={styles.meta}>
-          {books.length} título{books.length === 1 ? '' : 's'}
+          {books.length} {plural(books.length, 'common.title')}
         </Text>
 
         <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
@@ -147,10 +149,10 @@ export default function ShelvesScreen({ onBack }: Props) {
                   />
                   <View style={styles.bookActions}>
                     <Pressable onPress={saveEdit}>
-                      <Text style={styles.act}>guardar</Text>
+                      <Text style={styles.act}>{t('common.save')}</Text>
                     </Pressable>
                     <Pressable onPress={() => setEditingId(null)}>
-                      <Text style={styles.actMuted}>cancelar</Text>
+                      <Text style={styles.actMuted}>{t('common.cancel')}</Text>
                     </Pressable>
                   </View>
                 </>
@@ -159,24 +161,24 @@ export default function ShelvesScreen({ onBack }: Props) {
                   <Text style={styles.bookLine}>{b.rawText}</Text>
                   <View style={styles.bookActions}>
                     {sentIds.has(b.id) ? (
-                      <Text style={styles.sent}>✓ enviado</Text>
+                      <Text style={styles.sent}>{t('shelves.sent')}</Text>
                     ) : (
                       <Pressable onPress={() => sendToSearch(b)}>
-                        <Text style={styles.act}>procurar</Text>
+                        <Text style={styles.act}>{t('shelves.sendToSearch')}</Text>
                       </Pressable>
                     )}
                     <Pressable onPress={() => startEdit(b)}>
-                      <Text style={styles.act}>editar</Text>
+                      <Text style={styles.act}>{t('common.edit')}</Text>
                     </Pressable>
                     <Pressable onPress={() => removeBook(b)}>
-                      <Text style={styles.actDanger}>apagar</Text>
+                      <Text style={styles.actDanger}>{t('common.delete')}</Text>
                     </Pressable>
                   </View>
                 </>
               )}
             </View>
           ))}
-          {books.length === 0 && <Text style={styles.meta}>Esta estante ficou sem títulos.</Text>}
+          {books.length === 0 && <Text style={styles.meta}>{t('shelves.emptyShelf')}</Text>}
         </ScrollView>
       </View>
     );
@@ -187,14 +189,14 @@ export default function ShelvesScreen({ onBack }: Props) {
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
-        <Text style={styles.link}>‹ Início</Text>
+        <Text style={styles.link}>{t('common.backHome')}</Text>
       </Pressable>
-      <Text style={styles.heading}>Estantes guardadas</Text>
+      <Text style={styles.heading}>{t('shelves.heading')}</Text>
 
       {shelves.length > 0 && (
         <TextInput
           style={styles.search}
-          placeholder="Procurar livro nas estantes"
+          placeholder={t('shelves.searchPlaceholder')}
           value={bookQuery}
           onChangeText={setBookQuery}
           autoCorrect={false}
@@ -206,7 +208,7 @@ export default function ShelvesScreen({ onBack }: Props) {
         <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
           {searching && <ActivityIndicator style={{ marginTop: 8 }} />}
           {!searching && bookHits.length === 0 && (
-            <Text style={styles.meta}>Nenhum livro encontrado nas estantes.</Text>
+            <Text style={styles.meta}>{t('shelves.noHits')}</Text>
           )}
           {bookHits.map((h, i) => (
             <Pressable
@@ -216,7 +218,7 @@ export default function ShelvesScreen({ onBack }: Props) {
             >
               <Text style={styles.hitTitle}>{h.rawText}</Text>
               <Text style={styles.meta}>
-                em: {h.shelfName}
+                {t('shelves.hitIn', { shelf: h.shelfName })}
                 {h.shelfLocation ? `  ·  ${h.shelfLocation}` : ''}
               </Text>
             </Pressable>
@@ -224,21 +226,19 @@ export default function ShelvesScreen({ onBack }: Props) {
         </ScrollView>
       ) : (
         <ScrollView style={styles.list}>
-          {shelves.length === 0 && (
-            <Text style={styles.meta}>Ainda não guardaste nenhuma estante.</Text>
-          )}
+          {shelves.length === 0 && <Text style={styles.meta}>{t('shelves.none')}</Text>}
           {shelves.map((s) => (
             <View key={s.id} style={styles.shelfRow}>
               <Pressable style={styles.shelfRowMain} onPress={() => openShelf(s.id)}>
                 <Text style={styles.shelfName}>{s.name}</Text>
                 <Text style={styles.meta}>
-                  {[s.location, `${s.bookCount} livro${s.bookCount === 1 ? '' : 's'}`]
+                  {[s.location, `${s.bookCount} ${plural(s.bookCount, 'common.book')}`]
                     .filter(Boolean)
                     .join('  ·  ')}
                 </Text>
               </Pressable>
               <Pressable onPress={() => removeShelf(s.id)}>
-                <Text style={styles.actDanger}>apagar</Text>
+                <Text style={styles.actDanger}>{t('common.delete')}</Text>
               </Pressable>
             </View>
           ))}

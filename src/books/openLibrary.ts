@@ -1,4 +1,4 @@
-import { languageName, SearchLang } from './searchLanguage';
+import { AppLang, languageName } from '../i18n/langs';
 
 export interface BookSearchResult {
   title: string;
@@ -65,7 +65,7 @@ async function fetchDocs(params: string): Promise<OpenLibraryDoc[]> {
   return json?.docs ?? [];
 }
 
-function mapDoc(doc: OpenLibraryDoc, lang: SearchLang, authorName?: string): BookSearchResult {
+function mapDoc(doc: OpenLibraryDoc, lang: AppLang, authorName?: string): BookSearchResult {
   const langs = doc.language ?? [];
   // When we queried with a language filter, the matching edition (and its
   // localised title) is returned inline — prefer that title.
@@ -77,7 +77,7 @@ function mapDoc(doc: OpenLibraryDoc, lang: SearchLang, authorName?: string): Boo
     year: doc.first_publish_year ?? null,
     coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
     workKey: doc.key,
-    otherLanguage: inChosen ? null : langs.length ? languageName(langs[0]) : null,
+    otherLanguage: inChosen ? null : langs.length ? languageName(lang, langs[0]) : null,
   };
 }
 
@@ -88,7 +88,7 @@ function mapDoc(doc: OpenLibraryDoc, lang: SearchLang, authorName?: string): Boo
  */
 async function searchWorks(
   baseParams: string,
-  lang: SearchLang,
+  lang: AppLang,
   limit: number,
   authorName?: string
 ): Promise<BookSearchResult[]> {
@@ -109,7 +109,7 @@ async function searchWorks(
 export async function searchBooks(
   title: string,
   author: string,
-  lang: SearchLang
+  lang: AppLang
 ): Promise<BookSearchResult[]> {
   const t = title.trim();
   const a = author.trim();
@@ -170,7 +170,7 @@ export async function searchAuthors(name: string): Promise<AuthorResult[]> {
 export async function getAuthorWorks(
   authorKey: string,
   authorName: string,
-  lang: SearchLang
+  lang: AppLang
 ): Promise<BookSearchResult[]> {
   const baseParams = `q=${encodeURIComponent(`author_key:${authorKey}`)}`;
   const works = await searchWorks(baseParams, lang, AUTHOR_WORKS_LIMIT, authorName);

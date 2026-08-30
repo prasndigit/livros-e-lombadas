@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import { BookSearchResult, searchBooks } from '../books/openLibrary';
-import { getSearchLang } from '../books/searchLanguage';
 import FoundPhoto from '../components/FoundPhoto';
+import { useT } from '../i18n/I18nProvider';
+import { getAppLang } from '../i18n/langs';
 import {
   addWishlistEntry,
   getWishlistEntries,
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function WishlistScreen({ onGoToScan, onBack }: Props) {
+  const { t } = useT();
   const [title, setTitle] = useState('');
   const [entries, setEntries] = useState<WishlistEntry[]>([]);
   const [ready, setReady] = useState(false);
@@ -50,10 +52,10 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
     setSearching(true);
     setSearchError(null);
     try {
-      const lang = await getSearchLang();
+      const lang = await getAppLang();
       setSearchResults(await searchBooks(title, '', lang));
     } catch {
-      setSearchError('Não foi possível pesquisar agora — verifica a ligação à internet.');
+      setSearchError(t('title.offline'));
     } finally {
       setSearching(false);
     }
@@ -86,20 +88,22 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
   return (
     <View style={styles.container}>
       <Pressable onPress={onBack}>
-        <Text style={styles.backLink}>‹ Início</Text>
+        <Text style={styles.backLink}>{t('common.backHome')}</Text>
       </Pressable>
-      <Text style={styles.heading}>Procurar por título</Text>
+      <Text style={styles.heading}>{t('title.heading')}</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Título"
+        placeholder={t('title.inputPlaceholder')}
         value={title}
         onChangeText={setTitle}
         onSubmitEditing={handleSearch}
         returnKeyType="search"
       />
       <Pressable style={styles.addButton} onPress={handleSearch} disabled={searching}>
-        <Text style={styles.addButtonText}>{searching ? 'A procurar...' : 'Procurar livro'}</Text>
+        <Text style={styles.addButtonText}>
+          {searching ? t('title.searchBtnBusy') : t('title.searchBtn')}
+        </Text>
       </Pressable>
 
       {searching && <ActivityIndicator style={{ marginBottom: 12 }} />}
@@ -126,7 +130,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
                 <Text style={styles.rowAuthor}>
                   {r.author}
                   {r.year ? ` · ${r.year}` : ''}
-                  {r.otherLanguage ? ` · em ${r.otherLanguage}` : ''}
+                  {r.otherLanguage ? ` · ${t('author.inLang', { lang: r.otherLanguage })}` : ''}
                 </Text>
               </View>
             </Pressable>
@@ -136,9 +140,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
 
       {(searchResults.length > 0 || (!searching && title.trim().length > 0)) && (
         <Pressable onPress={handleAddManual} style={styles.manualAddButton}>
-          <Text style={styles.manualAddButtonText}>
-            Não encontrei — adicionar "{title}" sem capa
-          </Text>
+          <Text style={styles.manualAddButtonText}>{t('title.notFound', { title })}</Text>
         </Pressable>
       )}
 
@@ -146,9 +148,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
         style={styles.list}
         data={entries}
         keyExtractor={(item) => String(item.id)}
-        ListEmptyComponent={
-          <Text style={styles.empty}>Ainda não adicionaste nenhum livro.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.empty}>{t('title.empty')}</Text>}
         renderItem={({ item }) => (
           <View style={styles.row}>
             {item.foundPhotoUri ? (
@@ -164,10 +164,10 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
             <View style={styles.rowText}>
               <Text style={styles.rowTitle}>{item.title}</Text>
               {!!item.author && <Text style={styles.rowAuthor}>{item.author}</Text>}
-              {!!item.foundPhotoUri && <Text style={styles.foundBadge}>✓ encontrado</Text>}
+              {!!item.foundPhotoUri && <Text style={styles.foundBadge}>{t('title.found')}</Text>}
             </View>
             <Pressable onPress={() => handleRemove(item.id)}>
-              <Text style={styles.remove}>remover</Text>
+              <Text style={styles.remove}>{t('common.delete')}</Text>
             </Pressable>
           </View>
         )}
@@ -178,7 +178,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
         disabled={!ready || entries.length === 0}
         onPress={() => onGoToScan(entries)}
       >
-        <Text style={styles.scanButtonText}>Ir para o scan</Text>
+        <Text style={styles.scanButtonText}>{t('title.goToScan')}</Text>
       </Pressable>
 
       {viewerEntry?.foundPhotoUri && (
@@ -196,7 +196,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
             />
           </View>
           <Pressable style={styles.viewerClose} onPress={() => setViewerEntry(null)}>
-            <Text style={styles.viewerCloseText}>Fechar</Text>
+            <Text style={styles.viewerCloseText}>{t('common.close')}</Text>
           </Pressable>
         </View>
       )}

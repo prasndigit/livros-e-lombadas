@@ -1,8 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { getSearchLang, languageName } from '../books/searchLanguage';
 import { tidyShelfTitles } from '../books/tidyTitles';
+import { useT } from '../i18n/I18nProvider';
+import { getAppLang, languageName } from '../i18n/langs';
 import { discardPhoto, recognizeText } from '../ocr/textRecognition';
 import { createShelf, initShelfStore } from '../storage/shelfStore';
 
@@ -18,10 +19,11 @@ interface Props {
  * Catalogue a whole shelf. Point the camera at the spines; each capture is
  * OCR'd on-device and the longest line read is kept as a candidate title.
  * Nothing is looked up anywhere — it just records the raw text. The session
- * ends deliberately with "Terminar estante", which saves name + location +
- * every title to the local database.
+ * ends deliberately with "Terminar estante", which spell-corrects the batch
+ * and saves name + location + every title to the local database.
  */
 export default function ShelfScanScreen({ onDone, onBack }: Props) {
+  const { t, plural } = useT();
   const [phase, setPhase] = useState<'setup' | 'scanning'>('setup');
   const [name, setName] = useState('');
   const [location, setLocation] = useState('');
@@ -53,13 +55,15 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
 
         const candidate = lines
           .map((l) => l.text.trim())
-          .filter((t) => t.length >= MIN_TITLE_LENGTH)
+          .filter((line) => line.length >= MIN_TITLE_LENGTH)
           .sort((a, b) => b.length - a.length)[0];
 
         if (candidate) {
           setLastRead(candidate);
           setTitles((prev) =>
-            prev.some((t) => t.toLowerCase() === candidate.toLowerCase()) ? prev : [candidate, ...prev]
+            prev.some((x) => x.toLowerCase() === candidate.toLowerCase())
+              ? prev
+              : [candidate, ...prev]
           );
         }
       } catch {
@@ -89,8 +93,8 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
     // server error) we still save the raw OCR reads.
     let toSave = raw;
     try {
-      const lang = await getSearchLang();
-      toSave = await tidyShelfTitles(raw, languageName(lang));
+      const lang = await getAppLang();
+      toSave = await tidyShelfTitles(raw, languageName(lang, lang));
     } catch {
       toSave = raw;
     }
@@ -107,22 +111,19 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
     return (
       <View style={styles.container}>
         <Pressable onPress={onBack}>
-          <Text style={styles.link}>‹ Início</Text>
+          <Text style={styles.link}>{t('common.backHome')}</Text>
         </Pressable>
-        <Text style={styles.heading}>Guardar estante</Text>
-        <Text style={styles.body}>
-          Dá um nome e um local à estante. Depois aponta a câmara às lombadas — a app vai
-          registando os títulos que consegue ler, sem os procurar em lado nenhum.
-        </Text>
+        <Text style={styles.heading}>{t('shelf.heading')}</Text>
+        <Text style={styles.body}>{t('shelf.intro')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Nome da estante (ex.: Estante da casa da Sofia)"
+          placeholder={t('shelf.namePlaceholder')}
           value={name}
           onChangeText={setName}
         />
         <TextInput
           style={styles.input}
-          placeholder="Localização (opcional)"
+          placeholder={t('shelf.locationPlaceholder')}
           value={location}
           onChangeText={setLocation}
         />
@@ -131,7 +132,7 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
           disabled={!name.trim()}
           onPress={() => setPhase('scanning')}
         >
-          <Text style={styles.primaryButtonText}>Começar a catalogar</Text>
+          <Text style={styles.primaryButtonText}>{t('shelf.startBtn')}</Text>
         </Pressable>
       </View>
     );
@@ -144,9 +145,9 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={styles.permissionText}>Precisamos de acesso à câmara para ler as lombadas.</Text>
+        <Text style={styles.permissionText}>{t('shelf.needCamera')}</Text>
         <Pressable style={styles.primaryButton} onPress={requestPermission}>
-          <Text style={styles.primaryButtonText}>Permitir câmara</Text>
+          <Text style={styles.primaryButtonText}>{t('common.allowCamera')}</Text>
         </Pressable>
       </View>
     );
@@ -158,26 +159,28 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         <View pointerEvents="none" style={styles.debugPanel}>
           <Text style={styles.debugText}>
-            {analyzing ? 'A ler...' : lastRead || 'aponta a uma lombada'}
+            {analyzing ? t('shelf.reading') : lastRead || t('shelf.pointSpine')}
           </Text>
         </View>
       </View>
 
       <View style={styles.panel}>
         <Text style={styles.panelHeading}>
-          {name} — {titles.length} título{titles.length === 1 ? '' : 's'}
+          {t('shelf.panelHeading', {
+            name,
+            count: titles.length,
+            noun: plural(titles.length, 'common.title'),
+          })}
         </Text>
         <ScrollView style={styles.titleList}>
-          {titles.length === 0 && (
-            <Text style={styles.hint}>Ainda nada. Aproxima e estabiliza numa lombada.</Text>
-          )}
-          {titles.map((t, i) => (
-            <View key={`${t}-${i}`} style={styles.titleRow}>
+          {titles.length === 0 && <Text style={styles.hint}>{t('shelf.nothingYet')}</Text>}
+          {titles.map((line, i) => (
+            <View key={`${line}-${i}`} style={styles.titleRow}>
               <Text style={styles.titleText} numberOfLines={2}>
-                {t}
+                {line}
               </Text>
               <Pressable onPress={() => removeTitle(i)}>
-                <Text style={styles.remove}>remover</Text>
+                <Text style={styles.remove}>{t('common.delete')}</Text>
               </Pressable>
             </View>
           ))}
@@ -185,10 +188,10 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
         <Pressable style={styles.finishButton} onPress={finish} disabled={saving}>
           <Text style={styles.finishButtonText}>
             {saving
-              ? 'A corrigir e guardar...'
+              ? t('shelf.finishBusy')
               : titles.length === 0
-                ? 'Terminar (sem títulos)'
-                : `Terminar estante (${titles.length})`}
+                ? t('shelf.finishEmpty')
+                : t('shelf.finish', { count: titles.length })}
           </Text>
         </Pressable>
       </View>

@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { AuthorResult, BookSearchResult, getAuthorWorks, searchAuthors } from '../books/openLibrary';
-import { getSearchLang } from '../books/searchLanguage';
+import { useT } from '../i18n/I18nProvider';
+import { getAppLang } from '../i18n/langs';
 import { addWishlistEntry } from '../storage/wishlistStore';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
+  const { t, plural } = useT();
   const [step, setStep] = useState<'author' | 'works'>('author');
   const [authorQuery, setAuthorQuery] = useState('');
   const [authors, setAuthors] = useState<AuthorResult[]>([]);
@@ -55,7 +57,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
         }
       } catch {
         if (seq === searchSeq.current) {
-          setError('Não foi possível procurar agora — verifica a ligação à internet.');
+          setError(t('author.offline'));
         }
       } finally {
         if (seq === searchSeq.current) setLoadingAuthors(false);
@@ -74,10 +76,10 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
     setError(null);
     try {
       const id = author.key.replace(/^\/authors\//, '');
-      const lang = await getSearchLang();
+      const lang = await getAppLang();
       setWorks(await getAuthorWorks(id, author.name, lang));
     } catch {
-      setError('Não foi possível carregar a bibliografia — verifica a ligação à internet.');
+      setError(t('author.loadError'));
     } finally {
       setLoadingWorks(false);
     }
@@ -106,7 +108,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
       }
       onAdded();
     } catch {
-      setError('Não foi possível adicionar todos os títulos.');
+      setError(t('author.addError'));
       setAdding(false);
     }
   };
@@ -115,16 +117,16 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <Pressable onPress={onBack}>
-          <Text style={styles.link}>‹ Início</Text>
+          <Text style={styles.link}>{t('common.backHome')}</Text>
         </Pressable>
-        <Text style={styles.heading}>Procurar por autor</Text>
+        <Text style={styles.heading}>{t('author.heading')}</Text>
       </View>
 
       {step === 'author' && (
         <>
           <TextInput
             style={styles.input}
-            placeholder="Nome do autor (ex.: Saramago)"
+            placeholder={t('author.inputPlaceholder')}
             value={authorQuery}
             onChangeText={setAuthorQuery}
             returnKeyType="search"
@@ -135,10 +137,10 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
             {loadingAuthors ? (
               <>
                 <ActivityIndicator size="small" />
-                <Text style={styles.hint}>a procurar...</Text>
+                <Text style={styles.hint}>{t('common.searchingLower')}</Text>
               </>
             ) : (
-              <Text style={styles.hint}>Sugestões à medida que escreves</Text>
+              <Text style={styles.hint}>{t('author.typeahead')}</Text>
             )}
           </View>
           {!!error && <Text style={styles.error}>{error}</Text>}
@@ -148,7 +150,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
               <Pressable key={a.key} style={styles.authorRow} onPress={() => pickAuthor(a)}>
                 <Text style={styles.authorName}>{a.name}</Text>
                 <Text style={styles.authorMeta}>
-                  {[a.lifespan, `${a.workCount} obra${a.workCount === 1 ? '' : 's'}`]
+                  {[a.lifespan, `${a.workCount} ${plural(a.workCount, 'common.work')}`]
                     .filter(Boolean)
                     .join('  ·  ')}
                 </Text>
@@ -160,7 +162,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
               </Pressable>
             ))}
             {!loadingAuthors && authors.length === 0 && authorQuery.trim().length >= 3 && !error && (
-              <Text style={styles.empty}>Sem resultados. Tenta outra grafia do nome.</Text>
+              <Text style={styles.empty}>{t('author.noResults')}</Text>
             )}
           </ScrollView>
         </>
@@ -169,9 +171,11 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
       {step === 'works' && selectedAuthor && (
         <>
           <Pressable onPress={() => setStep('author')}>
-            <Text style={styles.link}>‹ outro autor</Text>
+            <Text style={styles.link}>{t('author.otherAuthor')}</Text>
           </Pressable>
-          <Text style={styles.bibHeading}>Bibliografia de {selectedAuthor.name}</Text>
+          <Text style={styles.bibHeading}>
+            {t('author.biblioOf', { name: selectedAuthor.name })}
+          </Text>
 
           {loadingWorks && <ActivityIndicator style={{ marginTop: 12 }} />}
           {!!error && <Text style={styles.error}>{error}</Text>}
@@ -179,15 +183,19 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
           {!loadingWorks && works.length > 0 && (
             <View style={styles.selectRow}>
               <Text style={styles.selectCount}>
-                {works.length} obra{works.length === 1 ? '' : 's'} · {checked.size} selecionada
-                {checked.size === 1 ? '' : 's'}
+                {t('author.counts', {
+                  works: works.length,
+                  worksNoun: plural(works.length, 'common.work'),
+                  sel: checked.size,
+                  selNoun: plural(checked.size, 'author.selectedFem'),
+                })}
               </Text>
               <View style={styles.selectActions}>
                 <Pressable onPress={selectAll}>
-                  <Text style={styles.link}>todos</Text>
+                  <Text style={styles.link}>{t('author.selectAll')}</Text>
                 </Pressable>
                 <Pressable onPress={clearAll}>
-                  <Text style={styles.link}>limpar</Text>
+                  <Text style={styles.link}>{t('author.clear')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -211,7 +219,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
                       {w.title}
                     </Text>
                     <Text style={styles.workYear}>
-                      {[w.year, w.otherLanguage ? `em ${w.otherLanguage}` : null]
+                      {[w.year, w.otherLanguage ? t('author.inLang', { lang: w.otherLanguage }) : null]
                         .filter(Boolean)
                         .join('  ·  ')}
                     </Text>
@@ -227,7 +235,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
             disabled={checked.size === 0 || adding}
           >
             <Text style={styles.primaryButtonText}>
-              {adding ? 'A adicionar...' : `Adicionar ${checked.size} à lista`}
+              {adding ? t('author.addBtnBusy') : t('author.addBtn', { count: checked.size })}
             </Text>
           </Pressable>
         </>
