@@ -71,8 +71,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceIndex, setDeviceIndex] = useState(0);
   const [matchedEntry, setMatchedEntry] = useState<WishlistEntry | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [debugReply, setDebugReply] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [showLog, setShowLog] = useState(false);
 
@@ -136,7 +134,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
     const canvas = canvasRef.current;
     if (isProcessingRef.current || !video || !canvas || video.videoWidth === 0) return;
     isProcessingRef.current = true;
-    setAnalyzing(true);
     let dataUri: string | undefined;
     try {
       const sx = Math.round(video.videoWidth * SCAN_REGION.xRatio);
@@ -152,7 +149,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       const base64 = dataUri.split(',')[1];
 
       const { entry, rawReply } = await identifyBook(base64, wishlist);
-      setDebugReply(rawReply);
       setServerConfigError(null);
       addLogEntry(dataUri, rawReply, entry ? entry.title : null);
 
@@ -173,15 +169,13 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('ANTHROPIC_API_KEY')) {
         setServerConfigError(message);
-      } else {
-        // Mostra o erro em vez de o engolir — sem isto não há forma de
-        // saber se falhou por chave inválida, CORS, rede, etc.
-        setDebugReply(`ERRO: ${message}`);
-        if (dataUri) addLogEntry(dataUri, `ERRO: ${message}`, null);
+      } else if (dataUri) {
+        // Regista o erro no log em vez de o engolir — sem isto não há forma
+        // de saber se falhou por chave inválida, CORS, rede, etc.
+        addLogEntry(dataUri, `ERRO: ${message}`, null);
       }
     } finally {
       isProcessingRef.current = false;
-      setAnalyzing(false);
     }
   }, [wishlist]);
 
@@ -310,10 +304,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
         <Pressable style={styles.logButton} onPress={() => setShowLog(true)}>
           <Text style={styles.flipButtonText}>Ver registo ({log.length})</Text>
         </Pressable>
-
-        <View pointerEvents="none" style={styles.debugPanel}>
-          <Text style={styles.debugText}>{analyzing ? 'A analisar...' : debugReply || '—'}</Text>
-        </View>
       </View>
 
       <View style={[styles.footer, matchedEntry && styles.footerMatched]}>
@@ -345,15 +335,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.6)',
     borderStyle: 'dashed',
     borderRadius: 10,
-  },
-  debugPanel: {
-    position: 'absolute',
-    left: 16,
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 8,
-    padding: 8,
   },
   debugText: { color: '#0f0', fontSize: 11 },
   flipButton: {

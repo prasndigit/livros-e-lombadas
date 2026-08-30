@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { BookSearchResult, searchBooks } from '../books/openLibrary';
+import { getSearchLang } from '../books/searchLanguage';
 import FoundPhoto from '../components/FoundPhoto';
 import {
   addWishlistEntry,
@@ -50,7 +51,8 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
     setSearching(true);
     setSearchError(null);
     try {
-      setSearchResults(await searchBooks(title, author));
+      const lang = await getSearchLang();
+      setSearchResults(await searchBooks(title, author, lang));
     } catch {
       setSearchError('Não foi possível pesquisar agora — verifica a ligação à internet.');
     } finally {
@@ -130,6 +132,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
                 <Text style={styles.rowAuthor}>
                   {r.author}
                   {r.year ? ` · ${r.year}` : ''}
+                  {r.otherLanguage ? ` · em ${r.otherLanguage}` : ''}
                 </Text>
               </View>
             </Pressable>

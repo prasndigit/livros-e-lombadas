@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { AuthorResult, BookSearchResult, getAuthorWorks, searchAuthors } from '../books/openLibrary';
+import { getSearchLang } from '../books/searchLanguage';
 import { addWishlistEntry } from '../storage/wishlistStore';
 
 interface Props {
@@ -53,7 +54,8 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
     setError(null);
     try {
       const id = author.key.replace(/^\/authors\//, '');
-      setWorks(await getAuthorWorks(id, author.name));
+      const lang = await getSearchLang();
+      setWorks(await getAuthorWorks(id, author.name, lang));
     } catch {
       setError('Não foi possível carregar a bibliografia — verifica a ligação à internet.');
     } finally {
@@ -184,7 +186,11 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
                     <Text style={styles.workTitle} numberOfLines={2}>
                       {w.title}
                     </Text>
-                    {!!w.year && <Text style={styles.workYear}>{w.year}</Text>}
+                    <Text style={styles.workYear}>
+                      {[w.year, w.otherLanguage ? `em ${w.otherLanguage}` : null]
+                        .filter(Boolean)
+                        .join('  ·  ')}
+                    </Text>
                   </View>
                 </Pressable>
               );

@@ -101,7 +101,7 @@ export default function ShelfScanScreen({ onDone, onBack }: Props) {
         </Text>
         <TextInput
           style={styles.input}
-          placeholder="Nome da estante (ex.: Estante da casa da Rita)"
+          placeholder="Nome da estante (ex.: Estante da casa da Sofia)"
           value={name}
           onChangeText={setName}
         />

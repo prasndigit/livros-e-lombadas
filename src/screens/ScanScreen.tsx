@@ -41,8 +41,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
   const [matchedBox, setMatchedBox] = useState<Frame | null>(null);
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
   const [facing, setFacing] = useState<'front' | 'back'>('back');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [debugReply, setDebugReply] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [showLog, setShowLog] = useState(false);
   const [zoomedEntry, setZoomedEntry] = useState<LogEntry | null>(null);
@@ -78,7 +76,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
     const interval = setInterval(async () => {
       if (isProcessingRef.current || !cameraRef.current) return;
       isProcessingRef.current = true;
-      setAnalyzing(true);
       try {
         // shutterSound: false — este é um varrimento passivo contínuo, não uma
         // fotografia deliberada; o clique do obturador a cada 1-2 s é ruído.
@@ -118,7 +115,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
           }
         }
 
-        setDebugReply(debugText);
         setMatchedEntry(finalEntry);
         setMatchedBox(finalBox);
         if (photo.base64) {
@@ -150,7 +146,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
         // a falha de uma captura isolada não deve travar o loop de scan
       } finally {
         isProcessingRef.current = false;
-        setAnalyzing(false);
       }
     }, CAPTURE_INTERVAL_MS);
 
@@ -262,10 +257,6 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
         <Pressable style={styles.logButton} onPress={() => setShowLog(true)}>
           <Text style={styles.flipButtonText}>Ver registo ({log.length})</Text>
         </Pressable>
-
-        <View pointerEvents="none" style={styles.debugPanel}>
-          <Text style={styles.debugText}>{analyzing ? 'A analisar...' : debugReply || '—'}</Text>
-        </View>
       </View>
 
       <View style={[styles.footer, matchedEntry && styles.footerMatched]}>
@@ -301,15 +292,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderWidth: 4,
     borderColor: '#1b998b',
-  },
-  debugPanel: {
-    position: 'absolute',
-    left: 16,
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 8,
-    padding: 8,
   },
   debugText: { color: '#0f0', fontSize: 11 },
   flipButton: {
