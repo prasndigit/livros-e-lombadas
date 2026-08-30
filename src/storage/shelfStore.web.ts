@@ -72,3 +72,24 @@ export async function getShelfBooks(shelfId: number): Promise<ShelfBook[]> {
 export async function deleteShelf(id: number): Promise<void> {
   writeAll(readAll().filter((s) => s.id !== id));
 }
+
+// bookId is the array index (see getShelfBooks, which returns id: i).
+export async function deleteShelfBook(shelfId: number, bookId: number): Promise<void> {
+  const all = readAll();
+  const shelf = all.find((s) => s.id === shelfId);
+  if (!shelf || !shelf.books[bookId]) return;
+  shelf.books.splice(bookId, 1);
+  writeAll(all);
+}
+
+export async function updateShelfBook(
+  shelfId: number,
+  bookId: number,
+  rawText: string
+): Promise<void> {
+  const all = readAll();
+  const shelf = all.find((s) => s.id === shelfId);
+  if (!shelf || !shelf.books[bookId]) return;
+  shelf.books[bookId].rawText = rawText;
+  writeAll(all);
+}

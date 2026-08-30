@@ -80,3 +80,22 @@ export async function deleteShelf(id: number): Promise<void> {
   await db.runAsync('DELETE FROM shelf_books WHERE shelfId = ?;', id);
   await db.runAsync('DELETE FROM shelves WHERE id = ?;', id);
 }
+
+export async function deleteShelfBook(shelfId: number, bookId: number): Promise<void> {
+  const db = await dbPromise;
+  await db.runAsync('DELETE FROM shelf_books WHERE id = ? AND shelfId = ?;', bookId, shelfId);
+}
+
+export async function updateShelfBook(
+  shelfId: number,
+  bookId: number,
+  rawText: string
+): Promise<void> {
+  const db = await dbPromise;
+  await db.runAsync(
+    'UPDATE shelf_books SET rawText = ? WHERE id = ? AND shelfId = ?;',
+    rawText,
+    bookId,
+    shelfId
+  );
+}

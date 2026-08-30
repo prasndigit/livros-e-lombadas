@@ -28,7 +28,6 @@ interface Props {
 
 export default function WishlistScreen({ onGoToScan, onBack }: Props) {
   const [title, setTitle] = useState('');
-  const [author, setAuthor] = useState('');
   const [entries, setEntries] = useState<WishlistEntry[]>([]);
   const [ready, setReady] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -52,7 +51,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
     setSearchError(null);
     try {
       const lang = await getSearchLang();
-      setSearchResults(await searchBooks(title, author, lang));
+      setSearchResults(await searchBooks(title, '', lang));
     } catch {
       setSearchError('Não foi possível pesquisar agora — verifica a ligação à internet.');
     } finally {
@@ -62,7 +61,6 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
 
   const clearForm = () => {
     setTitle('');
-    setAuthor('');
     setSearchResults([]);
     setSearchError(null);
   };
@@ -75,7 +73,7 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
 
   const handleAddManual = async () => {
     if (!title.trim()) return;
-    await addWishlistEntry(title, author);
+    await addWishlistEntry(title, '');
     clearForm();
     await reload();
   };
@@ -97,12 +95,8 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
         placeholder="Título"
         value={title}
         onChangeText={setTitle}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Autor (opcional, ajuda a pesquisa)"
-        value={author}
-        onChangeText={setAuthor}
+        onSubmitEditing={handleSearch}
+        returnKeyType="search"
       />
       <Pressable style={styles.addButton} onPress={handleSearch} disabled={searching}>
         <Text style={styles.addButtonText}>{searching ? 'A procurar...' : 'Procurar livro'}</Text>
@@ -141,9 +135,9 @@ export default function WishlistScreen({ onGoToScan, onBack }: Props) {
       )}
 
       {(searchResults.length > 0 || (!searching && title.trim().length > 0)) && (
-        <Pressable onPress={handleAddManual} style={styles.manualAddLink}>
-          <Text style={styles.manualAddLinkText}>
-            Não encontrei o meu livro — adicionar "{title}" sem capa
+        <Pressable onPress={handleAddManual} style={styles.manualAddButton}>
+          <Text style={styles.manualAddButtonText}>
+            Não encontrei — adicionar "{title}" sem capa
           </Text>
         </Pressable>
       )}
@@ -244,8 +238,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  manualAddLink: { marginBottom: 16, alignSelf: 'flex-start' },
-  manualAddLinkText: { color: '#2f6690', fontSize: 13 },
+  manualAddButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    backgroundColor: '#fff4e6',
+    borderWidth: 1,
+    borderColor: '#e0a44a',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  manualAddButtonText: { color: '#b26a00', fontWeight: '600', fontSize: 13 },
   list: { flex: 1 },
   empty: { color: '#888', textAlign: 'center', marginTop: 20 },
   row: {
