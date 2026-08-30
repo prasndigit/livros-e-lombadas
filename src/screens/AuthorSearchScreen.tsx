@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -31,19 +31,39 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAuthorSearch = async () => {
-    if (authorQuery.trim().length < 2) return;
-    setLoadingAuthors(true);
-    setError(null);
-    setAuthors([]);
-    try {
-      setAuthors(await searchAuthors(authorQuery));
-    } catch {
-      setError('Não foi possível procurar agora — verifica a ligação à internet.');
-    } finally {
+  const searchSeq = useRef(0);
+
+  // Live suggestions: debounce the typing, then query. A sequence guard drops
+  // any response that arrives after a newer keystroke.
+  useEffect(() => {
+    const q = authorQuery.trim();
+    const seq = ++searchSeq.current;
+
+    if (q.length < 3) {
+      setAuthors([]);
       setLoadingAuthors(false);
+      return;
     }
-  };
+
+    setLoadingAuthors(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchAuthors(q);
+        if (seq === searchSeq.current) {
+          setAuthors(results);
+          setError(null);
+        }
+      } catch {
+        if (seq === searchSeq.current) {
+          setError('Não foi possível procurar agora — verifica a ligação à internet.');
+        }
+      } finally {
+        if (seq === searchSeq.current) setLoadingAuthors(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [authorQuery]);
 
   const pickAuthor = async (author: AuthorResult) => {
     setSelectedAuthor(author);
@@ -104,19 +124,23 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
         <>
           <TextInput
             style={styles.input}
-            placeholder="Nome do autor"
+            placeholder="Nome do autor (ex.: Saramago)"
             value={authorQuery}
             onChangeText={setAuthorQuery}
-            onSubmitEditing={handleAuthorSearch}
             returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="words"
           />
-          <Pressable style={styles.primaryButton} onPress={handleAuthorSearch} disabled={loadingAuthors}>
-            <Text style={styles.primaryButtonText}>
-              {loadingAuthors ? 'A procurar...' : 'Procurar autor'}
-            </Text>
-          </Pressable>
-
-          {loadingAuthors && <ActivityIndicator style={{ marginTop: 12 }} />}
+          <View style={styles.statusRow}>
+            {loadingAuthors ? (
+              <>
+                <ActivityIndicator size="small" />
+                <Text style={styles.hint}>a procurar...</Text>
+              </>
+            ) : (
+              <Text style={styles.hint}>Sugestões à medida que escreves</Text>
+            )}
+          </View>
           {!!error && <Text style={styles.error}>{error}</Text>}
 
           <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
@@ -135,7 +159,7 @@ export default function AuthorSearchScreen({ onBack, onAdded }: Props) {
                 )}
               </Pressable>
             ))}
-            {!loadingAuthors && authors.length === 0 && authorQuery.trim().length >= 2 && !error && (
+            {!loadingAuthors && authors.length === 0 && authorQuery.trim().length >= 3 && !error && (
               <Text style={styles.empty}>Sem resultados. Tenta outra grafia do nome.</Text>
             )}
           </ScrollView>
@@ -222,8 +246,10 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 8,
     padding: 10,
-    marginBottom: 10,
+    marginBottom: 6,
   },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 20 },
+  hint: { fontSize: 12, color: '#8a8a8a' },
   primaryButton: {
     backgroundColor: '#2f6690',
     borderRadius: 8,
