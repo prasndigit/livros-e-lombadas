@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import FoundPhoto from '../components/FoundPhoto';
 import { playAlertSound, primeAlertSound } from '../alert/sound';
 import { findWishlistMatch } from '../match/fuzzyMatch';
 import { discardPhoto, recognizeText } from '../ocr/textRecognition';
@@ -20,6 +21,9 @@ interface LogEntry {
   imageUri: string;
   debugText: string;
   matchedTitle: string | null;
+  box: Frame | null;
+  imgW: number;
+  imgH: number;
 }
 
 interface Props {
@@ -41,11 +45,19 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
   const [debugReply, setDebugReply] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [showLog, setShowLog] = useState(false);
+  const [zoomedEntry, setZoomedEntry] = useState<LogEntry | null>(null);
 
-  const addLogEntry = (imageUri: string, debugText: string, matchedTitle: string | null) => {
+  const addLogEntry = (
+    imageUri: string,
+    debugText: string,
+    matchedTitle: string | null,
+    box: Frame | null,
+    imgW: number,
+    imgH: number
+  ) => {
     setLog((prev) =>
       [
-        { time: new Date().toLocaleTimeString('pt-PT'), imageUri, debugText, matchedTitle },
+        { time: new Date().toLocaleTimeString('pt-PT'), imageUri, debugText, matchedTitle, box, imgW, imgH },
         ...prev,
       ].slice(0, MAX_LOG_ENTRIES)
     );
@@ -68,7 +80,13 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       isProcessingRef.current = true;
       setAnalyzing(true);
       try {
-        const photo = await cameraRef.current.takePictureAsync({ quality: 0.4, base64: true });
+        // shutterSound: false — este é um varrimento passivo contínuo, não uma
+        // fotografia deliberada; o clique do obturador a cada 1-2 s é ruído.
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.4,
+          base64: true,
+          shutterSound: false,
+        });
         if (!photo) return;
         const { lines, imageWidth, imageHeight } = await recognizeText(
           photo.uri,
@@ -104,7 +122,14 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
         setMatchedEntry(finalEntry);
         setMatchedBox(finalBox);
         if (photo.base64) {
-          addLogEntry(`data:image/jpeg;base64,${photo.base64}`, debugText, finalEntry?.title ?? null);
+          addLogEntry(
+            `data:image/jpeg;base64,${photo.base64}`,
+            debugText,
+            finalEntry?.title ?? null,
+            finalBox,
+            imageWidth,
+            imageHeight
+          );
         }
 
         if (finalEntry) {
@@ -114,7 +139,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             playAlertSound();
             const savedUri = await persistMatchedPhoto(photo.uri, finalEntry.id);
-            await markWishlistEntryFound(finalEntry.id, savedUri);
+            await markWishlistEntryFound(finalEntry.id, savedUri, finalBox, imageWidth, imageHeight);
           } else {
             discardPhoto(photo.uri);
           }
@@ -167,7 +192,12 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
           {log.length === 0 && <Text style={styles.debugText}>(ainda sem tentativas)</Text>}
           {log.map((item, i) => (
             <View key={i} style={styles.logEntry}>
-              <Image source={{ uri: item.imageUri }} style={styles.logThumbnail} />
+              <Pressable onPress={() => setZoomedEntry(item)}>
+                <Image
+                  source={{ uri: item.imageUri }}
+                  style={[styles.logThumbnail, item.matchedTitle && styles.logThumbnailMatched]}
+                />
+              </Pressable>
               <View style={styles.logEntryText}>
                 <Text style={styles.logEntryTime}>{item.time}</Text>
                 <Text style={item.matchedTitle ? styles.logEntryMatched : styles.debugText}>
@@ -178,9 +208,32 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
             </View>
           ))}
         </ScrollView>
-        <Pressable style={styles.backButton} onPress={() => setShowLog(false)}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => {
+            setZoomedEntry(null);
+            setShowLog(false);
+          }}
+        >
           <Text style={styles.backButtonText}>Voltar ao scan</Text>
         </Pressable>
+
+        {zoomedEntry && (
+          <View style={styles.zoomOverlay}>
+            <View style={styles.zoomPhotoWrap}>
+              <FoundPhoto
+                uri={zoomedEntry.imageUri}
+                matched={!!zoomedEntry.matchedTitle}
+                box={zoomedEntry.box}
+                imageWidth={zoomedEntry.imgW}
+                imageHeight={zoomedEntry.imgH}
+              />
+            </View>
+            <Pressable style={styles.zoomCloseButton} onPress={() => setZoomedEntry(null)}>
+              <Text style={styles.backButtonText}>Voltar ao tamanho original</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   }
@@ -199,6 +252,7 @@ export default function ScanScreen({ wishlist, onBack }: Props) {
       <View style={styles.cameraWrapper} onLayout={handleLayout}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
         {overlayStyle && <View style={[styles.highlightBox, overlayStyle]} />}
+        {matchedEntry && !overlayStyle && <View pointerEvents="none" style={styles.highlightFull} />}
         <Pressable
           style={styles.flipButton}
           onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
@@ -236,6 +290,17 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#1b998b',
     borderRadius: 6,
+  },
+  // Fallback cue when a match has no coordinates (cloud/IA path): frame the
+  // whole preview so there is still a clear "found" signal.
+  highlightFull: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 4,
+    borderColor: '#1b998b',
   },
   debugPanel: {
     position: 'absolute',
@@ -314,7 +379,27 @@ const styles = StyleSheet.create({
     borderBottomColor: '#222',
   },
   logThumbnail: { width: 50, height: 70, borderRadius: 6, marginRight: 10, backgroundColor: '#222' },
+  logThumbnailMatched: { borderWidth: 2, borderColor: '#1b998b' },
   logEntryText: { flex: 1 },
   logEntryTime: { color: '#888', fontSize: 11, marginBottom: 2 },
   logEntryMatched: { color: '#1b998b', fontWeight: '700', fontSize: 13, marginBottom: 2 },
+  zoomOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  zoomPhotoWrap: { width: '100%', height: '82%' },
+  zoomCloseButton: {
+    marginTop: 20,
+    backgroundColor: '#2f6690',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
 });

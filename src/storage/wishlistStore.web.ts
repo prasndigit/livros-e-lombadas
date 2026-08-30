@@ -1,3 +1,4 @@
+import { Frame } from '../ocr/types';
 import { WishlistEntry } from '../types/book';
 
 const STORAGE_KEY = 'livros-e-lombadas.wishlist';
@@ -34,11 +35,20 @@ export async function getWishlistEntries(): Promise<WishlistEntry[]> {
   return readAll();
 }
 
-export async function markWishlistEntryFound(id: number, photoUri: string): Promise<void> {
+export async function markWishlistEntryFound(
+  id: number,
+  photoUri: string,
+  box?: Frame | null,
+  imageWidth?: number,
+  imageHeight?: number
+): Promise<void> {
   const entries = readAll();
   const entry = entries.find((e) => e.id === id);
   if (!entry) return;
   entry.foundPhotoUri = photoUri;
   entry.foundAt = new Date().toISOString();
+  entry.foundBox = box ?? undefined;
+  entry.foundImageWidth = imageWidth;
+  entry.foundImageHeight = imageHeight;
   writeAll(entries);
 }
