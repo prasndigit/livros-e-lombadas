@@ -1,0 +1,320 @@
+import * as Haptics from 'expo-haptics';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import React, { useEffect, useRef, useState } from 'react';
+import { Image, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { playAlertSound, primeAlertSound } from '../alert/sound';
+import { findWishlistMatch } from '../match/fuzzyMatch';
+import { discardPhoto, recognizeText } from '../ocr/textRecognition';
+import { Frame } from '../ocr/types';
+import { persistMatchedPhoto } from '../photo/persistMatchedPhoto';
+import { markWishlistEntryFound } from '../storage/wishlistStore';
+import { WishlistEntry } from '../types/book';
+import { identifyBook } from '../vision/identifyBook';
+
+const CAPTURE_INTERVAL_MS = 1200;
+const ALERT_COOLDOWN_MS = 4000;
+const MAX_LOG_ENTRIES = 20;
+
+interface LogEntry {
+  time: string;
+  imageUri: string;
+  debugText: string;
+  matchedTitle: string | null;
+}
+
+interface Props {
+  wishlist: WishlistEntry[];
+  onBack: () => void;
+}
+
+export default function ScanScreen({ wishlist, onBack }: Props) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
+  const isProcessingRef = useRef(false);
+  const lastAlertAtRef = useRef(0);
+  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const [matchedEntry, setMatchedEntry] = useState<WishlistEntry | null>(null);
+  const [matchedBox, setMatchedBox] = useState<Frame | null>(null);
+  const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [debugReply, setDebugReply] = useState('');
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [showLog, setShowLog] = useState(false);
+
+  const addLogEntry = (imageUri: string, debugText: string, matchedTitle: string | null) => {
+    setLog((prev) =>
+      [
+        { time: new Date().toLocaleTimeString('pt-PT'), imageUri, debugText, matchedTitle },
+        ...prev,
+      ].slice(0, MAX_LOG_ENTRIES)
+    );
+  };
+
+  useEffect(() => {
+    primeAlertSound();
+  }, []);
+
+  useEffect(() => {
+    if (!permission) return;
+    if (!permission.granted) requestPermission();
+  }, [permission, requestPermission]);
+
+  useEffect(() => {
+    if (!permission?.granted) return;
+
+    const interval = setInterval(async () => {
+      if (isProcessingRef.current || !cameraRef.current) return;
+      isProcessingRef.current = true;
+      setAnalyzing(true);
+      try {
+        const photo = await cameraRef.current.takePictureAsync({ quality: 0.4, base64: true });
+        if (!photo) return;
+        const { lines, imageWidth, imageHeight } = await recognizeText(
+          photo.uri,
+          photo.width,
+          photo.height
+        );
+        setImageSize({ width: imageWidth, height: imageHeight });
+
+        const mlKitMatch = findWishlistMatch(lines, wishlist);
+        let finalEntry: WishlistEntry | null = null;
+        let finalBox: Frame | null = null;
+        let debugText = `ML Kit: ${lines.length} linha(s) lida(s), sem correspondência`;
+
+        if (mlKitMatch) {
+          finalEntry = mlKitMatch.entry;
+          const matchedLine = lines.find((l) => l.text.trim() === mlKitMatch.matchedLine);
+          finalBox = matchedLine?.frame ?? null;
+          debugText = `ML Kit: "${mlKitMatch.matchedLine}" → ${mlKitMatch.entry.title}`;
+        } else if (photo.base64) {
+          // ML Kit found nothing — ask the vision model as a slower, paid
+          // fallback (handles decorative fonts / different editions ML Kit misses).
+          try {
+            const { entry, rawReply } = await identifyBook(photo.base64, wishlist);
+            finalEntry = entry;
+            debugText += `\nIA: ${rawReply}`;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            debugText += `\nIA: ERRO - ${message}`;
+          }
+        }
+
+        setDebugReply(debugText);
+        setMatchedEntry(finalEntry);
+        setMatchedBox(finalBox);
+        if (photo.base64) {
+          addLogEntry(`data:image/jpeg;base64,${photo.base64}`, debugText, finalEntry?.title ?? null);
+        }
+
+        if (finalEntry) {
+          const now = Date.now();
+          if (now - lastAlertAtRef.current > ALERT_COOLDOWN_MS) {
+            lastAlertAtRef.current = now;
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            playAlertSound();
+            const savedUri = await persistMatchedPhoto(photo.uri, finalEntry.id);
+            await markWishlistEntryFound(finalEntry.id, savedUri);
+          } else {
+            discardPhoto(photo.uri);
+          }
+        } else {
+          discardPhoto(photo.uri);
+        }
+      } catch {
+        // a falha de uma captura isolada não deve travar o loop de scan
+      } finally {
+        isProcessingRef.current = false;
+        setAnalyzing(false);
+      }
+    }, CAPTURE_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [permission?.granted, wishlist]);
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setLayout({ width, height });
+  };
+
+  if (!permission) {
+    return <View style={styles.container} />;
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.permissionText}>
+          Precisamos de acesso à câmara para identificar os livros.
+        </Text>
+        <Pressable style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Permitir câmara</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (showLog) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.logHeader}>
+          <Text style={styles.logHeaderText}>Registo de tentativas ({log.length})</Text>
+          <Pressable onPress={() => setLog([])}>
+            <Text style={styles.logHeaderAction}>limpar</Text>
+          </Pressable>
+        </View>
+        <ScrollView style={styles.logScroll}>
+          {log.length === 0 && <Text style={styles.debugText}>(ainda sem tentativas)</Text>}
+          {log.map((item, i) => (
+            <View key={i} style={styles.logEntry}>
+              <Image source={{ uri: item.imageUri }} style={styles.logThumbnail} />
+              <View style={styles.logEntryText}>
+                <Text style={styles.logEntryTime}>{item.time}</Text>
+                <Text style={item.matchedTitle ? styles.logEntryMatched : styles.debugText}>
+                  {item.matchedTitle ? `✓ ${item.matchedTitle}` : '(sem correspondência)'}
+                </Text>
+                <Text style={styles.debugText}>{item.debugText}</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+        <Pressable style={styles.backButton} onPress={() => setShowLog(false)}>
+          <Text style={styles.backButtonText}>Voltar ao scan</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const overlayStyle = matchedBox
+    ? {
+        left: (matchedBox.left / imageSize.width) * layout.width,
+        top: (matchedBox.top / imageSize.height) * layout.height,
+        width: (matchedBox.width / imageSize.width) * layout.width,
+        height: (matchedBox.height / imageSize.height) * layout.height,
+      }
+    : null;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.cameraWrapper} onLayout={handleLayout}>
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
+        {overlayStyle && <View style={[styles.highlightBox, overlayStyle]} />}
+        <Pressable
+          style={styles.flipButton}
+          onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}
+        >
+          <Text style={styles.flipButtonText}>Trocar câmara</Text>
+        </Pressable>
+        <Pressable style={styles.logButton} onPress={() => setShowLog(true)}>
+          <Text style={styles.flipButtonText}>Ver registo ({log.length})</Text>
+        </Pressable>
+
+        <View pointerEvents="none" style={styles.debugPanel}>
+          <Text style={styles.debugText}>{analyzing ? 'A analisar...' : debugReply || '—'}</Text>
+        </View>
+      </View>
+
+      <View style={[styles.footer, matchedEntry && styles.footerMatched]}>
+        <Text style={styles.footerText}>
+          {matchedEntry
+            ? `✓ Encontrado: ${matchedEntry.title}`
+            : `A procurar ${wishlist.length} livro(s)...`}
+        </Text>
+        <Pressable style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>Voltar à wishlist</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
+  cameraWrapper: { flex: 1 },
+  highlightBox: {
+    position: 'absolute',
+    borderWidth: 3,
+    borderColor: '#1b998b',
+    borderRadius: 6,
+  },
+  debugPanel: {
+    position: 'absolute',
+    left: 16,
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    padding: 8,
+  },
+  debugText: { color: '#0f0', fontSize: 11 },
+  flipButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  logButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  flipButtonText: { color: '#fff', fontWeight: '600' },
+  footer: {
+    padding: 16,
+    paddingBottom: 32,
+    backgroundColor: '#111',
+    alignItems: 'center',
+  },
+  footerMatched: { backgroundColor: '#1b998b' },
+  footerText: { color: '#fff', fontSize: 16, marginBottom: 10, fontWeight: '700' },
+  backButton: {
+    backgroundColor: '#2f6690',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    margin: 16,
+  },
+  backButtonText: { color: '#fff', fontWeight: '600' },
+  permissionText: {
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 100,
+    marginBottom: 20,
+    paddingHorizontal: 24,
+  },
+  button: {
+    backgroundColor: '#2f6690',
+    borderRadius: 8,
+    padding: 12,
+    alignSelf: 'center',
+  },
+  buttonText: { color: '#fff', fontWeight: '600' },
+  logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 50,
+  },
+  logHeaderText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  logHeaderAction: { color: '#c0392b', fontSize: 14 },
+  logScroll: { flex: 1, paddingHorizontal: 16 },
+  logEntry: {
+    flexDirection: 'row',
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  logThumbnail: { width: 50, height: 70, borderRadius: 6, marginRight: 10, backgroundColor: '#222' },
+  logEntryText: { flex: 1 },
+  logEntryTime: { color: '#888', fontSize: 11, marginBottom: 2 },
+  logEntryMatched: { color: '#1b998b', fontWeight: '700', fontSize: 13, marginBottom: 2 },
+});
