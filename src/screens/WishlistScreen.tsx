@@ -22,9 +22,10 @@ import { WishlistEntry } from '../types/book';
 
 interface Props {
   onGoToScan: (wishlist: WishlistEntry[]) => void;
+  onBack: () => void;
 }
 
-export default function WishlistScreen({ onGoToScan }: Props) {
+export default function WishlistScreen({ onGoToScan, onBack }: Props) {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [entries, setEntries] = useState<WishlistEntry[]>([]);
@@ -84,7 +85,10 @@ export default function WishlistScreen({ onGoToScan }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>A minha wishlist</Text>
+      <Pressable onPress={onBack}>
+        <Text style={styles.backLink}>‹ Início</Text>
+      </Pressable>
+      <Text style={styles.heading}>Procurar por título</Text>
 
       <TextInput
         style={styles.input}
@@ -205,7 +209,8 @@ export default function WishlistScreen({ onGoToScan }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 20, paddingTop: 60 },
-  heading: { fontSize: 22, fontWeight: '700', marginBottom: 16 },
+  backLink: { color: '#2f6690', fontSize: 14, fontWeight: '600', paddingVertical: 4 },
+  heading: { fontSize: 22, fontWeight: '700', marginTop: 4, marginBottom: 16 },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',

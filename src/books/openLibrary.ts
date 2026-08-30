@@ -59,8 +59,12 @@ export async function searchBooks(title: string, author = ''): Promise<BookSearc
     workKey: doc.key,
   }));
 
-  // The catalog returns many near-identical works for the same book. Collapse
-  // them by title+author so the user sees distinct options, not repeats.
+  return dedupeByTitleAuthor(results);
+}
+
+// The catalog returns many near-identical works for the same book. Collapse
+// them by title+author so the user sees distinct options, not repeats.
+function dedupeByTitleAuthor(results: BookSearchResult[]): BookSearchResult[] {
   const seen = new Set<string>();
   return results.filter((r) => {
     const fingerprint = `${r.title.toLowerCase().trim()}|${r.author.toLowerCase().trim()}`;
@@ -68,4 +72,95 @@ export async function searchBooks(title: string, author = ''): Promise<BookSearc
     seen.add(fingerprint);
     return true;
   });
+}
+
+export interface AuthorResult {
+  key: string;
+  name: string;
+  workCount: number;
+  topWork: string | null;
+  lifespan: string | null;
+}
+
+interface OpenLibraryAuthorDoc {
+  key: string;
+  name: string;
+  work_count?: number;
+  top_work?: string;
+  birth_date?: string;
+  death_date?: string;
+}
+
+interface OpenLibraryWorkEntry {
+  key: string;
+  title: string;
+  covers?: number[];
+  first_publish_date?: string;
+}
+
+/** Author name -> candidate authors, for disambiguation. */
+export async function searchAuthors(name: string): Promise<AuthorResult[]> {
+  const q = name.trim();
+  if (q.length < 2) return [];
+
+  const url = `https://openlibrary.org/search/authors.json?q=${encodeURIComponent(q)}&limit=10`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Open Library error ${response.status}`);
+  }
+
+  const json = await response.json();
+  const docs: OpenLibraryAuthorDoc[] = json?.docs ?? [];
+
+  return docs
+    .filter((doc) => doc.key && doc.name)
+    .map((doc) => {
+      const birth = doc.birth_date?.trim();
+      const death = doc.death_date?.trim();
+      const lifespan = birth || death ? `${birth ?? '?'}–${death ?? ''}`.replace(/–$/, '') : null;
+      return {
+        key: doc.key,
+        name: doc.name,
+        workCount: doc.work_count ?? 0,
+        topWork: doc.top_work ?? null,
+        lifespan,
+      };
+    });
+}
+
+/**
+ * Every work Open Library files under an author, mapped to the same shape as
+ * a title search so the picker and the wishlist store can treat them alike.
+ * `authorKey` is the bare OLxxxxA id (no "/authors/" prefix).
+ */
+export async function getAuthorWorks(
+  authorKey: string,
+  authorName: string,
+  limit = 50
+): Promise<BookSearchResult[]> {
+  const url = `https://openlibrary.org/authors/${encodeURIComponent(authorKey)}/works.json?limit=${limit}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Open Library error ${response.status}`);
+  }
+
+  const json = await response.json();
+  const entries: OpenLibraryWorkEntry[] = json?.entries ?? [];
+
+  const results: BookSearchResult[] = entries
+    .filter((e) => e.title)
+    .map((e) => {
+      const yearMatch = e.first_publish_date?.match(/\d{4}/);
+      return {
+        title: normalizeTitle(e.title),
+        author: authorName,
+        year: yearMatch ? parseInt(yearMatch[0], 10) : null,
+        coverUrl: e.covers?.[0] ? `https://covers.openlibrary.org/b/id/${e.covers[0]}-M.jpg` : null,
+        workKey: e.key,
+      };
+    });
+
+  return dedupeByTitleAuthor(results).sort((a, b) =>
+    a.title.localeCompare(b.title, 'pt', { sensitivity: 'base' })
+  );
 }
