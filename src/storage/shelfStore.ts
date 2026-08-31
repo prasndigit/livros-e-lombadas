@@ -1,7 +1,4 @@
-import * as SQLite from 'expo-sqlite';
-
-// Same database file as the wishlist — one db, separate tables.
-const dbPromise = SQLite.openDatabaseAsync('wishlist.db');
+import { getDb } from './db';
 
 export interface ShelfSummary {
   id: number;
@@ -24,27 +21,14 @@ export interface ShelfHit {
   rawText: string;
 }
 
+/** Kept for callers that still init explicitly; getDb() already creates the tables. */
 export async function initShelfStore(): Promise<void> {
-  const db = await dbPromise;
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS shelves (
-      id INTEGER PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      location TEXT,
-      createdAt TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS shelf_books (
-      id INTEGER PRIMARY KEY NOT NULL,
-      shelfId INTEGER NOT NULL,
-      rawText TEXT NOT NULL,
-      capturedAt TEXT NOT NULL
-    );
-  `);
+  await getDb();
 }
 
 /** Persists a whole cataloguing session at once. `titles` are raw OCR reads, in capture order. */
 export async function createShelf(name: string, location: string, titles: string[]): Promise<number> {
-  const db = await dbPromise;
+  const db = await getDb();
   const now = new Date().toISOString();
   const result = await db.runAsync(
     'INSERT INTO shelves (name, location, createdAt) VALUES (?, ?, ?);',
@@ -65,7 +49,7 @@ export async function createShelf(name: string, location: string, titles: string
 }
 
 export async function getShelves(): Promise<ShelfSummary[]> {
-  const db = await dbPromise;
+  const db = await getDb();
   return db.getAllAsync<ShelfSummary>(`
     SELECT s.id, s.name, s.location, s.createdAt,
            (SELECT COUNT(*) FROM shelf_books b WHERE b.shelfId = s.id) AS bookCount
@@ -75,7 +59,7 @@ export async function getShelves(): Promise<ShelfSummary[]> {
 }
 
 export async function getShelfBooks(shelfId: number): Promise<ShelfBook[]> {
-  const db = await dbPromise;
+  const db = await getDb();
   return db.getAllAsync<ShelfBook>(
     'SELECT id, rawText, capturedAt FROM shelf_books WHERE shelfId = ? ORDER BY id ASC;',
     shelfId
@@ -83,7 +67,7 @@ export async function getShelfBooks(shelfId: number): Promise<ShelfBook[]> {
 }
 
 export async function deleteShelf(id: number): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDb();
   await db.runAsync('DELETE FROM shelf_books WHERE shelfId = ?;', id);
   await db.runAsync('DELETE FROM shelves WHERE id = ?;', id);
 }
@@ -92,7 +76,7 @@ export async function deleteShelf(id: number): Promise<void> {
 export async function searchShelfBooks(query: string): Promise<ShelfHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
-  const db = await dbPromise;
+  const db = await getDb();
   const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
   return db.getAllAsync<ShelfHit>(
     `SELECT b.rawText AS rawText, s.id AS shelfId, s.name AS shelfName, s.location AS shelfLocation
@@ -104,7 +88,7 @@ export async function searchShelfBooks(query: string): Promise<ShelfHit[]> {
 }
 
 export async function deleteShelfBook(shelfId: number, bookId: number): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDb();
   await db.runAsync('DELETE FROM shelf_books WHERE id = ? AND shelfId = ?;', bookId, shelfId);
 }
 
@@ -113,7 +97,7 @@ export async function updateShelfBook(
   bookId: number,
   rawText: string
 ): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDb();
   await db.runAsync(
     'UPDATE shelf_books SET rawText = ? WHERE id = ? AND shelfId = ?;',
     rawText,

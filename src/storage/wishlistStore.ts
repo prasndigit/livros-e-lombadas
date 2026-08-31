@@ -1,8 +1,6 @@
-import * as SQLite from 'expo-sqlite';
 import { Frame } from '../ocr/types';
 import { WishlistEntry } from '../types/book';
-
-const dbPromise = SQLite.openDatabaseAsync('wishlist.db');
+import { getDb } from './db';
 
 interface WishlistRow {
   id: number;
@@ -16,40 +14,13 @@ interface WishlistRow {
   foundImageHeight: number | null;
 }
 
+/** Kept for callers that still init explicitly; getDb() already creates the tables. */
 export async function initWishlistStore(): Promise<void> {
-  const db = await dbPromise;
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS wishlist (
-      id INTEGER PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      author TEXT NOT NULL,
-      coverUrl TEXT,
-      foundPhotoUri TEXT,
-      foundAt TEXT,
-      foundBox TEXT,
-      foundImageWidth INTEGER,
-      foundImageHeight INTEGER
-    );
-  `);
-  // Upgrade path for dev installs created before these columns existed.
-  for (const column of [
-    'coverUrl TEXT',
-    'foundPhotoUri TEXT',
-    'foundAt TEXT',
-    'foundBox TEXT',
-    'foundImageWidth INTEGER',
-    'foundImageHeight INTEGER',
-  ]) {
-    try {
-      await db.execAsync(`ALTER TABLE wishlist ADD COLUMN ${column};`);
-    } catch {
-      // column already exists
-    }
-  }
+  await getDb();
 }
 
 export async function addWishlistEntry(title: string, author: string, coverUrl?: string): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDb();
   await db.runAsync(
     'INSERT INTO wishlist (title, author, coverUrl) VALUES (?, ?, ?);',
     title.trim(),
@@ -59,12 +30,12 @@ export async function addWishlistEntry(title: string, author: string, coverUrl?:
 }
 
 export async function removeWishlistEntry(id: number): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDb();
   await db.runAsync('DELETE FROM wishlist WHERE id = ?;', id);
 }
 
 export async function getWishlistEntries(): Promise<WishlistEntry[]> {
-  const db = await dbPromise;
+  const db = await getDb();
   const rows = await db.getAllAsync<WishlistRow>(
     `SELECT id, title, author, coverUrl, foundPhotoUri, foundAt,
             foundBox, foundImageWidth, foundImageHeight
@@ -101,7 +72,7 @@ export async function markWishlistEntryFound(
   imageWidth?: number,
   imageHeight?: number
 ): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDb();
   await db.runAsync(
     `UPDATE wishlist
      SET foundPhotoUri = ?, foundAt = ?, foundBox = ?, foundImageWidth = ?, foundImageHeight = ?

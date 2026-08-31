@@ -55,6 +55,12 @@ const videoStyle: React.CSSProperties = {
  * Android tablets/browsers — it silently returns the same (often front)
  * camera. Instead we enumerate every video input device ourselves and let
  * the user cycle through them explicitly with the "Trocar câmara" button.
+ *
+ * This screen is deliberately simpler than the native ScanScreen. Web has no
+ * on-device OCR (no ML Kit), so it identifies matches through the cloud vision
+ * model only and never has a text bounding box — hence no highlight rectangle,
+ * no FoundPhoto viewer, and no photo-zoom in the log. The native screen is the
+ * one that gets those features; the web build is a fallback for quick testing.
  */
 export default function ScanScreen({ wishlist, onBack }: Props) {
   const { t, plural } = useT();
