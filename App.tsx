@@ -29,6 +29,13 @@ export default function App() {
     setRoute('scan');
   };
 
+  // Leaving the scan always lands on the wishlist ("Voltar à wishlist"),
+  // whether the scan was started from there or from the home shortcut.
+  const goToWishlist = () => {
+    setWishlistVersion((v) => v + 1);
+    setRoute('title');
+  };
+
   return (
     <I18nProvider>
       <SafeAreaView style={styles.container}>
@@ -56,7 +63,9 @@ export default function App() {
 
         {route === 'shelves' && <ShelvesScreen onBack={goHome} />}
 
-        {route === 'scan' && scanWishlist && <ScanScreen wishlist={scanWishlist} onBack={goHome} />}
+        {route === 'scan' && scanWishlist && (
+          <ScanScreen wishlist={scanWishlist} onBack={goToWishlist} />
+        )}
 
         <StatusBar style="auto" />
       </SafeAreaView>
