@@ -32,7 +32,7 @@ export default function HomeScreen({ onNavigate, onGoToScan, refreshKey }: Props
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Livros e Lombadas</Text>
+      <Text style={styles.heading}>{'Livros & Lombadas'}</Text>
       <Text style={styles.subheading}>{t('home.subtitle')}</Text>
 
       <Pressable style={styles.option} onPress={() => onNavigate('title')}>
